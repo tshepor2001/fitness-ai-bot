@@ -41,15 +41,17 @@ class _UserSession:
                     "GARMIN_PASSWORD": creds["garmin_password"],
                 },
             ),
-            "trainingpeaks": StdioServerParameters(
+        }
+
+        if "tp_username" in creds:
+            servers["trainingpeaks"] = StdioServerParameters(
                 command="npx",
                 args=["-y", "trainingpeaks-mcp@latest"],
                 env={
                     "TP_USERNAME": creds["tp_username"],
                     "TP_PASSWORD": creds["tp_password"],
                 },
-            ),
-        }
+            )
 
         for name, params in servers.items():
             try:
@@ -163,19 +165,3 @@ class MCPPool:
                 if now - self._sessions[uid].last_used > config.SESSION_IDLE_TIMEOUT:
                     logger.info("Idle timeout for user %d", uid)
                     await self._evict(uid)
-            return f"Error: unknown tool '{tool_name}'"
-
-        server_name, _ = self._tool_registry[tool_name]
-        session = self._sessions[server_name]
-
-        result = await session.call_tool(tool_name, arguments)
-
-        # extract text from MCP result
-        parts = []
-        for block in result.content:
-            if hasattr(block, "text"):
-                parts.append(block.text)
-            else:
-                parts.append(json.dumps(block.model_dump(), default=str))
-
-        return "\n".join(parts)

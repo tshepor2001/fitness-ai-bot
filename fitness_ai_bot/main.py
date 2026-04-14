@@ -131,7 +131,7 @@ async def cmd_disconnect(update: Update, context) -> None:
 async def cmd_start(update: Update, context) -> None:
     await update.message.reply_text(
         "Hey! I'm your fitness AI assistant 🏃‍♂️\n\n"
-        "Use /connect to link your Garmin + TrainingPeaks accounts.\n"
+        "Use /connect to link your Garmin account (TrainingPeaks is optional).\n"
         "Then just ask me anything about your training data!\n\n"
         "Commands:\n"
         "/connect — link your accounts\n"
@@ -200,6 +200,7 @@ def main() -> None:
         states={
             GARMIN_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, recv_garmin_email)],
             GARMIN_PASS:  [MessageHandler(filters.TEXT & ~filters.COMMAND, recv_garmin_pass)],
+            TP_ASK:       [MessageHandler(filters.TEXT & ~filters.COMMAND, recv_tp_ask)],
             TP_EMAIL:     [MessageHandler(filters.TEXT & ~filters.COMMAND, recv_tp_email)],
             TP_PASS:      [MessageHandler(filters.TEXT & ~filters.COMMAND, recv_tp_pass)],
         },

@@ -1,6 +1,6 @@
 # Fitness AI Bot
 
-A multi-user Telegram bot that answers fitness questions using your **Garmin Connect** and **TrainingPeaks** data, powered by Claude AI.
+A multi-user Telegram bot that answers fitness questions using your **Garmin Connect** and (optionally) **TrainingPeaks** data, powered by Claude AI.
 
 Ask questions like:
 - "What was my training load this week?"
@@ -87,11 +87,11 @@ flowchart TB
     class ONBOARD,BRAIN,POOL,VAULT zone2
 ```
 
-Each user gets their own pair of MCP server subprocesses, spawned on demand and evicted after idle timeout. Credentials are encrypted at rest with AES-128 (Fernet) and never stored in plaintext.
+Each user gets their own MCP server subprocesses (Garmin always, TrainingPeaks if connected), spawned on demand and evicted after idle timeout. Credentials are encrypted at rest with AES-128 (Fernet) and never stored in plaintext.
 
 ## Features
 
-- **Multi-user** — each Telegram user connects their own Garmin + TrainingPeaks accounts
+- **Multi-user** — each Telegram user connects their own Garmin account (TrainingPeaks is optional)
 - **Conversational AI** — Claude Haiku with tool-use for real data retrieval (no fabricated metrics)
 - **Secure credential handling** — Fernet-encrypted SQLite store, credential messages auto-deleted from chat
 - **Session pooling** — MCP subprocesses spawned on demand, evicted after configurable idle timeout
@@ -101,8 +101,8 @@ Each user gets their own pair of MCP server subprocesses, spawned on demand and 
 ## Prerequisites
 
 - Python 3.11+
-- Node.js 20+ (for TrainingPeaks MCP server via `npx`)
 - [uv](https://github.com/astral-sh/uv) (for Garmin MCP server via `uvx`)
+- Node.js 20+ (for TrainingPeaks MCP server via `npx`, only needed if users connect TrainingPeaks)
 - An [Anthropic API key](https://console.anthropic.com/)
 - A [Telegram bot token](https://core.telegram.org/bots#botfather)
 
@@ -180,7 +180,7 @@ ssh root@<LINODE_IP> 'cd /opt/fitness-ai-bot && docker restart fitness-bot'
 | Command | Description |
 |---|---|
 | `/start` | Welcome message and available commands |
-| `/connect` | Link your Garmin + TrainingPeaks accounts (4-step guided flow) |
+| `/connect` | Link your Garmin account and optionally TrainingPeaks (guided flow) |
 | `/disconnect` | Remove your stored credentials and tear down sessions |
 
 After `/connect`, just send any fitness question as a regular message.
