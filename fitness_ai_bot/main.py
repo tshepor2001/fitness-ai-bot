@@ -12,9 +12,7 @@ from telegram.ext import (
 )
 
 from fitness_ai_bot import config
-from fitness_ai_bot.agent import ask
-from fitness_ai_bot.credential_store import CredentialStore
-from fitness_ai_bot.mcp_client import MCPPool
+from fitness_ai_bot.service import FitnessAgentService
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,8 +20,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-store = CredentialStore()
-pool: MCPPool  # initialised in post_init
+service = FitnessAgentService()
 
 # ── auth ─────────────────────────────────────────────────────────────
 
@@ -40,7 +37,7 @@ def _is_authorised(update: Update) -> bool:
 
 # ── /connect conversation states ─────────────────────────────────────
 
-GARMIN_EMAIL, GARMIN_PASS, TP_EMAIL, TP_PASS = range(4)
+GARMIN_EMAIL, GARMIN_PASS, TP_DECISION, TP_EMAIL, TP_PASS = range(5)
 
 
 async def cmd_connect(update: Update, context) -> int:
@@ -65,8 +62,33 @@ async def recv_garmin_email(update: Update, context) -> int:
 async def recv_garmin_pass(update: Update, context) -> int:
     context.user_data["garmin_password"] = update.message.text.strip()
     await _delete_msg(update)
-    await update.message.reply_text("TrainingPeaks **email**:", parse_mode="Markdown")
-    return TP_EMAIL
+    await update.message.reply_text(
+        "Do you want to connect TrainingPeaks too? Reply **yes** or **no**.",
+        parse_mode="Markdown",
+    )
+    return TP_DECISION
+
+
+async def recv_tp_decision(update: Update, context) -> int:
+    decision = (update.message.text or "").strip().lower()
+    if decision in {"no", "n", "skip"}:
+        uid = update.effective_user.id
+        creds = {
+            "garmin_email": context.user_data.pop("garmin_email"),
+            "garmin_password": context.user_data.pop("garmin_password"),
+        }
+        await service.connect_user(uid, creds)
+        await update.message.reply_text(
+            "Connected Garmin. You can add TrainingPeaks later by running /connect again."
+        )
+        return ConversationHandler.END
+
+    if decision in {"yes", "y"}:
+        await update.message.reply_text("TrainingPeaks **email**:", parse_mode="Markdown")
+        return TP_EMAIL
+
+    await update.message.reply_text("Please reply with **yes** or **no**.", parse_mode="Markdown")
+    return TP_DECISION
 
 
 async def recv_tp_email(update: Update, context) -> int:
@@ -88,9 +110,7 @@ async def recv_tp_pass(update: Update, context) -> int:
         "tp_password": context.user_data.pop("tp_password"),
     }
 
-    await store.save(uid, creds)
-    # evict any stale session so next query spawns fresh
-    await pool.evict_user(uid)
+    await service.connect_user(uid, creds)
 
     await update.message.reply_text(
         "✅ Connected! Your credentials are encrypted and stored.\n\n"
@@ -118,8 +138,7 @@ async def _delete_msg(update: Update) -> None:
 
 async def cmd_disconnect(update: Update, context) -> None:
     uid = update.effective_user.id
-    await pool.evict_user(uid)
-    deleted = await store.delete(uid)
+    deleted = await service.disconnect_user(uid)
     if deleted:
         await update.message.reply_text("🗑️ Your credentials and sessions have been removed.")
     else:
@@ -148,13 +167,8 @@ async def handle_message(update: Update, context) -> None:
         return
 
     uid = update.effective_user.id
-    session = await pool.get_session(uid)
-
-    if session is None:
-        await update.message.reply_text(
-            "You haven't connected your accounts yet.\n"
-            "Use /connect to get started."
-        )
+    if not await service.has_credentials(uid):
+        await update.message.reply_text("You haven't connected your accounts yet.\nUse /connect to get started.")
         return
 
     question = update.message.text
@@ -162,7 +176,7 @@ async def handle_message(update: Update, context) -> None:
     await update.message.chat.send_action("typing")
 
     try:
-        answer = await ask(question, session)
+        answer = await service.ask_user(uid, question)
     except Exception:
         logger.exception("Agent error for user %d", uid)
         answer = "Something went wrong processing your request. Please try again."
@@ -174,16 +188,12 @@ async def handle_message(update: Update, context) -> None:
 # ── lifecycle ────────────────────────────────────────────────────────
 
 async def post_init(app: Application) -> None:
-    global pool
-    await store.open()
-    pool = MCPPool(store)
-    await pool.start()
+    await service.start()
     logger.info("Credential store + MCP pool ready.")
 
 
 async def post_shutdown(app: Application) -> None:
-    await pool.stop()
-    await store.close()
+    await service.stop()
 
 
 def main() -> None:
@@ -200,7 +210,7 @@ def main() -> None:
         states={
             GARMIN_EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, recv_garmin_email)],
             GARMIN_PASS:  [MessageHandler(filters.TEXT & ~filters.COMMAND, recv_garmin_pass)],
-            TP_ASK:       [MessageHandler(filters.TEXT & ~filters.COMMAND, recv_tp_ask)],
+            TP_DECISION:  [MessageHandler(filters.TEXT & ~filters.COMMAND, recv_tp_decision)],
             TP_EMAIL:     [MessageHandler(filters.TEXT & ~filters.COMMAND, recv_tp_email)],
             TP_PASS:      [MessageHandler(filters.TEXT & ~filters.COMMAND, recv_tp_pass)],
         },

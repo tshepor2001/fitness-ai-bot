@@ -10,7 +10,10 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "aiosqlite>=0.20.0",
     "cryptography>=43.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
 ]
 
 [project.scripts]
 fitness-bot = "fitness_ai_bot.main:main"
+fitness-bot-api = "fitness_ai_bot.http_api:main"

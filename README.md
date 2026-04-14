@@ -146,6 +146,36 @@ pip install -e .
 python -m fitness_ai_bot.main
 ```
 
+## HTTP Agent API (Optional)
+
+You can run the same core agent service behind an HTTP API:
+
+```bash
+pip install -e .
+fitness-bot-api
+```
+
+Default bind: `0.0.0.0:8000`
+
+### Endpoints
+
+- `GET /health` — liveness check
+- `POST /users/{user_id}/connect` — save encrypted credentials
+- `DELETE /users/{user_id}/connect` — delete credentials + evict sessions
+- `POST /users/{user_id}/ask` — ask a question using MCP-backed tools
+
+Example:
+
+```bash
+curl -X POST http://localhost:8000/users/123/connect \
+    -H "content-type: application/json" \
+    -d '{"garmin_email":"you@example.com","garmin_password":"secret"}'
+
+curl -X POST http://localhost:8000/users/123/ask \
+    -H "content-type: application/json" \
+    -d '{"question":"How was my training load this week?"}'
+```
+
 ## Docker
 
 ```bash

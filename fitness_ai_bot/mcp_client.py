@@ -27,6 +27,7 @@ class _UserSession:
 
     async def start(self, creds: dict[str, str]) -> None:
         await self._exit_stack.__aenter__()
+        connected_servers = 0
 
         servers = {
             "garmin": StdioServerParameters(
@@ -72,9 +73,14 @@ class _UserSession:
                         "description": tool.description or "",
                         "input_schema": tool.inputSchema,
                     })
+                connected_servers += 1
                 logger.info("User session: connected to %s (%d tools)", name, len(tools_result.tools))
             except Exception:
                 logger.exception("Failed to connect to %s for user session", name)
+
+        if connected_servers == 0 or not self._tool_registry:
+            await self.stop()
+            raise RuntimeError("No MCP tools are available for this user session")
 
     async def stop(self) -> None:
         await self._exit_stack.aclose()
