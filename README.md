@@ -12,61 +12,94 @@ Ask questions like:
 ## Architecture
 
 ```mermaid
-flowchart TB
-    subgraph Telegram
-        U1[👤 User A]
-        U2[👤 User B]
-        U3[👤 User N]
-    end
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#6C5CE7', 'primaryTextColor': '#fff', 'primaryBorderColor': '#a29bfe', 'lineColor': '#74b9ff', 'secondaryColor': '#0984e3', 'tertiaryColor': '#2d3436', 'fontSize': '14px' }}}%%
 
-    subgraph Bot["Bot Process (Docker on Linode)"]
-        TG[Telegram Bot Handler]
-        AUTH[Auth & Access Control]
-        CONNECT["/connect Onboarding"]
-
-        subgraph AI["Claude AI Agent"]
-            LOOP["Tool-Use Loop\n(up to 10 rounds)"]
-        end
-
-        subgraph Pool["Per-User MCP Session Pool"]
-            direction TB
-            SA["Session A"]
-            SB["Session B"]
-            REAPER["♻️ Idle Reaper\n(evicts after timeout)"]
-        end
-
-        subgraph Store["Credential Store"]
-            FERNET["🔒 Fernet AES-128\nEncryption"]
-            SQLITE[("SQLite DB\n(persistent volume)")]
-        end
-    end
-
-    subgraph MCP["MCP Servers (subprocesses per user)"]
+flowchart LR
+    subgraph users [" 💬 Telegram Users "]
         direction TB
-        GA["🏃 Garmin MCP\n(uvx)"]
-        TP["🚴 TrainingPeaks MCP\n(npx)"]
+        U1(("👤\nUser A"))
+        U2(("👤\nUser B"))
+        U3(("👤\n· · ·"))
     end
 
-    U1 & U2 & U3 -->|message| TG
-    TG --> AUTH
-    AUTH -->|new user| CONNECT
-    CONNECT -->|encrypt & store| FERNET
-    FERNET --> SQLITE
-    AUTH -->|question| LOOP
-    LOOP -->|"get_session()"| Pool
-    Pool -->|load creds| FERNET
-    SA & SB -->|tool calls| GA & TP
-    LOOP -->|call_tool| SA & SB
-    GA & TP -->|data| LOOP
-    LOOP -->|answer| TG
-    TG -->|reply| U1 & U2 & U3
+    subgraph bot [" 🤖 Bot Process · Docker on Linode Nanode "]
+        direction TB
 
-    style Bot fill:#1a1a2e,stroke:#16213e,color:#fff
-    style AI fill:#0f3460,stroke:#533483,color:#fff
-    style Pool fill:#16213e,stroke:#0f3460,color:#fff
-    style Store fill:#1a1a2e,stroke:#e94560,color:#fff
-    style MCP fill:#0a0a1a,stroke:#533483,color:#fff
-    style Telegram fill:#0088cc22,stroke:#0088cc,color:#fff
+        subgraph ingress [" Message Handling "]
+            direction LR
+            TG["📨 Telegram\nBot Handler"]
+            AUTH{{"🔑 Auth\nCheck"}}
+            TG --> AUTH
+        end
+
+        subgraph onboard [" Onboarding "]
+            CONNECT["📋 /connect\n4-step flow"]
+        end
+
+        subgraph brain [" 🧠 Claude Haiku Agent "]
+            LOOP["🔄 Tool-Use Loop\n≤ 10 rounds per query"]
+        end
+
+        subgraph sessions [" ⚡ Session Pool "]
+            direction TB
+            SA["Session A\n🟢 active"]
+            SB["Session B\n🟢 active"]
+            REAPER["♻️ Reaper\ntimeout eviction"]
+        end
+
+        subgraph vault [" 🔐 Credential Vault "]
+            direction TB
+            FERNET["Fernet AES-128\nencrypt / decrypt"]
+            SQLITE[("💾 SQLite\npersistent vol")]
+            FERNET <--> SQLITE
+        end
+
+        AUTH -- "new user" --> CONNECT
+        CONNECT -. "encrypt\n& store" .-> FERNET
+        AUTH -- "question" --> LOOP
+        LOOP -- "get_session()" --> sessions
+        sessions -. "load creds" .-> FERNET
+    end
+
+    subgraph data [" 📊 Fitness Data Sources "]
+        direction TB
+        GA["🏃 Garmin MCP\nvia uvx subprocess"]
+        TP["🚴 TrainingPeaks MCP\nvia npx subprocess"]
+    end
+
+    U1 & U2 & U3 -- "message" --> TG
+    SA & SB <-- "tool calls" --> GA & TP
+    LOOP <--> SA & SB
+    TG -. "reply" .-> U1 & U2 & U3
+
+    style users fill:#0984e3,stroke:#74b9ff,color:#fff,stroke-width:2px
+    style bot fill:#2d3436,stroke:#636e72,color:#fff,stroke-width:2px
+    style ingress fill:#2d3436,stroke:#6C5CE7,color:#dfe6e9,stroke-width:1px
+    style onboard fill:#2d3436,stroke:#fdcb6e,color:#dfe6e9,stroke-width:1px
+    style brain fill:#6C5CE7,stroke:#a29bfe,color:#fff,stroke-width:2px
+    style sessions fill:#00b894,stroke:#55efc4,color:#fff,stroke-width:2px
+    style vault fill:#d63031,stroke:#ff7675,color:#fff,stroke-width:2px
+    style data fill:#e17055,stroke:#fab1a0,color:#fff,stroke-width:2px
+
+    style U1 fill:#0984e3,stroke:#74b9ff,color:#fff
+    style U2 fill:#0984e3,stroke:#74b9ff,color:#fff
+    style U3 fill:#0984e3,stroke:#74b9ff,color:#fff
+    style TG fill:#6C5CE7,stroke:#a29bfe,color:#fff
+    style AUTH fill:#fdcb6e,stroke:#ffeaa7,color:#2d3436
+    style CONNECT fill:#fdcb6e,stroke:#ffeaa7,color:#2d3436
+    style LOOP fill:#6C5CE7,stroke:#a29bfe,color:#fff
+    style SA fill:#00b894,stroke:#55efc4,color:#fff
+    style SB fill:#00b894,stroke:#55efc4,color:#fff
+    style REAPER fill:#636e72,stroke:#b2bec3,color:#fff
+    style FERNET fill:#d63031,stroke:#ff7675,color:#fff
+    style SQLITE fill:#d63031,stroke:#ff7675,color:#fff
+    style GA fill:#e17055,stroke:#fab1a0,color:#fff
+    style TP fill:#e17055,stroke:#fab1a0,color:#fff
+
+    linkStyle 0,1,2,3,4,5 stroke:#a29bfe,stroke-width:2px
+    linkStyle 6,7 stroke:#74b9ff,stroke-width:2px
+    linkStyle 8,9 stroke:#55efc4,stroke-width:2px
+    linkStyle 10 stroke:#74b9ff,stroke-width:1px,stroke-dasharray:5
 ```
 
 Each user gets their own pair of MCP server subprocesses, spawned on demand and evicted after idle timeout. Credentials are encrypted at rest with AES-128 (Fernet) and never stored in plaintext.
