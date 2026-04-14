@@ -12,94 +12,79 @@ Ask questions like:
 ## Architecture
 
 ```mermaid
-%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#6C5CE7', 'primaryTextColor': '#fff', 'primaryBorderColor': '#a29bfe', 'lineColor': '#74b9ff', 'secondaryColor': '#0984e3', 'tertiaryColor': '#2d3436', 'fontSize': '14px' }}}%%
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4f46e5', 'primaryTextColor': '#f8fafc', 'primaryBorderColor': '#818cf8', 'lineColor': '#94a3b8', 'fontSize': '13px', 'fontFamily': 'ui-monospace, monospace' }}}%%
 
-flowchart LR
-    subgraph users [" 💬 Telegram Users "]
-        direction TB
-        U1(("👤\nUser A"))
-        U2(("👤\nUser B"))
-        U3(("👤\n· · ·"))
-    end
+flowchart TB
+    U(("💬<br/>Telegram<br/>Users")) -->|message| TG
 
-    subgraph bot [" 🤖 Bot Process · Docker on Linode Nanode "]
+    subgraph BOT [" "]
         direction TB
 
-        subgraph ingress [" Message Handling "]
+        TG("📨 Bot Handler") --> AUTH{"Authorised?"}
+
+        AUTH -->|"first time"| CONNECT
+        AUTH -->|"has creds"| AGENT
+
+        subgraph ONBOARD [" 📋  Onboarding "]
+            CONNECT("/connect · 4-step credential flow")
+        end
+
+        subgraph BRAIN [" 🧠  AI Engine "]
+            AGENT("Claude Haiku · tool-use loop ≤10 rounds")
+        end
+
+        subgraph POOL [" ⚡  Session Pool "]
             direction LR
-            TG["📨 Telegram\nBot Handler"]
-            AUTH{{"🔑 Auth\nCheck"}}
-            TG --> AUTH
+            S1("MCP Session per user") ~~~ REAP("♻️ Idle reaper")
         end
 
-        subgraph onboard [" Onboarding "]
-            CONNECT["📋 /connect\n4-step flow"]
+        subgraph VAULT [" 🔐  Credential Store "]
+            direction LR
+            ENC("Fernet AES-128") --- DB[("SQLite")]
         end
 
-        subgraph brain [" 🧠 Claude Haiku Agent "]
-            LOOP["🔄 Tool-Use Loop\n≤ 10 rounds per query"]
-        end
-
-        subgraph sessions [" ⚡ Session Pool "]
-            direction TB
-            SA["Session A\n🟢 active"]
-            SB["Session B\n🟢 active"]
-            REAPER["♻️ Reaper\ntimeout eviction"]
-        end
-
-        subgraph vault [" 🔐 Credential Vault "]
-            direction TB
-            FERNET["Fernet AES-128\nencrypt / decrypt"]
-            SQLITE[("💾 SQLite\npersistent vol")]
-            FERNET <--> SQLITE
-        end
-
-        AUTH -- "new user" --> CONNECT
-        CONNECT -. "encrypt\n& store" .-> FERNET
-        AUTH -- "question" --> LOOP
-        LOOP -- "get_session()" --> sessions
-        sessions -. "load creds" .-> FERNET
+        CONNECT -->|"encrypt & save"| ENC
+        AGENT <-->|"get / create session"| S1
+        S1 -.->|"load creds"| ENC
     end
 
-    subgraph data [" 📊 Fitness Data Sources "]
-        direction TB
-        GA["🏃 Garmin MCP\nvia uvx subprocess"]
-        TP["🚴 TrainingPeaks MCP\nvia npx subprocess"]
+    subgraph DATA [" "]
+        direction LR
+        GARMIN("🏃  Garmin Connect<br/><i>via uvx</i>")
+        TP("🚴  TrainingPeaks<br/><i>via npx</i>")
     end
 
-    U1 & U2 & U3 -- "message" --> TG
-    SA & SB <-- "tool calls" --> GA & TP
-    LOOP <--> SA & SB
-    TG -. "reply" .-> U1 & U2 & U3
+    S1 <-->|"MCP tool calls"| GARMIN & TP
+    AGENT -->|"answer"| TG
+    TG -.->|"reply"| U
 
-    style users fill:#0984e3,stroke:#74b9ff,color:#fff,stroke-width:2px
-    style bot fill:#2d3436,stroke:#636e72,color:#fff,stroke-width:2px
-    style ingress fill:#2d3436,stroke:#6C5CE7,color:#dfe6e9,stroke-width:1px
-    style onboard fill:#2d3436,stroke:#fdcb6e,color:#dfe6e9,stroke-width:1px
-    style brain fill:#6C5CE7,stroke:#a29bfe,color:#fff,stroke-width:2px
-    style sessions fill:#00b894,stroke:#55efc4,color:#fff,stroke-width:2px
-    style vault fill:#d63031,stroke:#ff7675,color:#fff,stroke-width:2px
-    style data fill:#e17055,stroke:#fab1a0,color:#fff,stroke-width:2px
+    classDef default fill:#1e293b,stroke:#334155,color:#f1f5f9,stroke-width:1.5px
+    classDef user fill:#6366f1,stroke:#818cf8,color:#fff,stroke-width:2px
+    classDef handler fill:#3b82f6,stroke:#60a5fa,color:#fff,stroke-width:1.5px
+    classDef gate fill:#f59e0b,stroke:#fbbf24,color:#1e293b,stroke-width:2px
+    classDef onboard fill:#f59e0b,stroke:#fbbf24,color:#1e293b,stroke-width:1.5px
+    classDef ai fill:#8b5cf6,stroke:#a78bfa,color:#fff,stroke-width:2px
+    classDef session fill:#10b981,stroke:#34d399,color:#fff,stroke-width:1.5px
+    classDef reaper fill:#475569,stroke:#64748b,color:#cbd5e1,stroke-width:1px
+    classDef crypto fill:#ef4444,stroke:#f87171,color:#fff,stroke-width:1.5px
+    classDef db fill:#ef4444,stroke:#f87171,color:#fff,stroke-width:1.5px
+    classDef source fill:#f97316,stroke:#fb923c,color:#fff,stroke-width:2px
+    classDef zone fill:#0f172a,stroke:#334155,color:#94a3b8,stroke-width:2px
+    classDef zone2 fill:#0f172a,stroke:#475569,color:#94a3b8,stroke-width:1px
 
-    style U1 fill:#0984e3,stroke:#74b9ff,color:#fff
-    style U2 fill:#0984e3,stroke:#74b9ff,color:#fff
-    style U3 fill:#0984e3,stroke:#74b9ff,color:#fff
-    style TG fill:#6C5CE7,stroke:#a29bfe,color:#fff
-    style AUTH fill:#fdcb6e,stroke:#ffeaa7,color:#2d3436
-    style CONNECT fill:#fdcb6e,stroke:#ffeaa7,color:#2d3436
-    style LOOP fill:#6C5CE7,stroke:#a29bfe,color:#fff
-    style SA fill:#00b894,stroke:#55efc4,color:#fff
-    style SB fill:#00b894,stroke:#55efc4,color:#fff
-    style REAPER fill:#636e72,stroke:#b2bec3,color:#fff
-    style FERNET fill:#d63031,stroke:#ff7675,color:#fff
-    style SQLITE fill:#d63031,stroke:#ff7675,color:#fff
-    style GA fill:#e17055,stroke:#fab1a0,color:#fff
-    style TP fill:#e17055,stroke:#fab1a0,color:#fff
-
-    linkStyle 0,1,2,3,4,5 stroke:#a29bfe,stroke-width:2px
-    linkStyle 6,7 stroke:#74b9ff,stroke-width:2px
-    linkStyle 8,9 stroke:#55efc4,stroke-width:2px
-    linkStyle 10 stroke:#74b9ff,stroke-width:1px,stroke-dasharray:5
+    class U user
+    class TG handler
+    class AUTH gate
+    class CONNECT onboard
+    class AGENT ai
+    class S1 session
+    class REAP reaper
+    class ENC crypto
+    class DB db
+    class GARMIN,TP source
+    class BOT zone
+    class DATA zone2
+    class ONBOARD,BRAIN,POOL,VAULT zone2
 ```
 
 Each user gets their own pair of MCP server subprocesses, spawned on demand and evicted after idle timeout. Credentials are encrypted at rest with AES-128 (Fernet) and never stored in plaintext.
