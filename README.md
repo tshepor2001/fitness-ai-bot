@@ -16,11 +16,13 @@ Ask questions like:
 
 flowchart TB
     U(("💬<br/>Telegram<br/>Users")) -->|message| TG
+    H(("🌐<br/>HTTP API<br/>Clients")) -->|request| API
 
     subgraph BOT [" "]
         direction TB
 
         TG("📨 Bot Handler") --> AUTH{"Authorised?"}
+        API("🔌 FastAPI Adapter") --> AUTH
 
         AUTH -->|"first time"| CONNECT
         AUTH -->|"has creds"| AGENT
@@ -73,7 +75,9 @@ flowchart TB
     classDef zone2 fill:#0f172a,stroke:#475569,color:#94a3b8,stroke-width:1px
 
     class U user
+    class H user
     class TG handler
+    class API handler
     class AUTH gate
     class CONNECT onboard
     class AGENT ai
