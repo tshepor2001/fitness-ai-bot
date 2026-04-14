@@ -11,14 +11,62 @@ Ask questions like:
 
 ## Architecture
 
-```
-Telegram ──► Bot Process ──► Claude AI (tool-use loop)
-                  │
-                  ├── Per-user MCP Session Pool
-                  │       ├── Garmin MCP (uvx subprocess)
-                  │       └── TrainingPeaks MCP (npx subprocess)
-                  │
-                  └── Encrypted Credential Store (SQLite + Fernet)
+```mermaid
+flowchart TB
+    subgraph Telegram
+        U1[👤 User A]
+        U2[👤 User B]
+        U3[👤 User N]
+    end
+
+    subgraph Bot["Bot Process (Docker on Linode)"]
+        TG[Telegram Bot Handler]
+        AUTH[Auth & Access Control]
+        CONNECT["/connect Onboarding"]
+
+        subgraph AI["Claude AI Agent"]
+            LOOP["Tool-Use Loop\n(up to 10 rounds)"]
+        end
+
+        subgraph Pool["Per-User MCP Session Pool"]
+            direction TB
+            SA["Session A"]
+            SB["Session B"]
+            REAPER["♻️ Idle Reaper\n(evicts after timeout)"]
+        end
+
+        subgraph Store["Credential Store"]
+            FERNET["🔒 Fernet AES-128\nEncryption"]
+            SQLITE[("SQLite DB\n(persistent volume)")]
+        end
+    end
+
+    subgraph MCP["MCP Servers (subprocesses per user)"]
+        direction TB
+        GA["🏃 Garmin MCP\n(uvx)"]
+        TP["🚴 TrainingPeaks MCP\n(npx)"]
+    end
+
+    U1 & U2 & U3 -->|message| TG
+    TG --> AUTH
+    AUTH -->|new user| CONNECT
+    CONNECT -->|encrypt & store| FERNET
+    FERNET --> SQLITE
+    AUTH -->|question| LOOP
+    LOOP -->|"get_session()"| Pool
+    Pool -->|load creds| FERNET
+    SA & SB -->|tool calls| GA & TP
+    LOOP -->|call_tool| SA & SB
+    GA & TP -->|data| LOOP
+    LOOP -->|answer| TG
+    TG -->|reply| U1 & U2 & U3
+
+    style Bot fill:#1a1a2e,stroke:#16213e,color:#fff
+    style AI fill:#0f3460,stroke:#533483,color:#fff
+    style Pool fill:#16213e,stroke:#0f3460,color:#fff
+    style Store fill:#1a1a2e,stroke:#e94560,color:#fff
+    style MCP fill:#0a0a1a,stroke:#533483,color:#fff
+    style Telegram fill:#0088cc22,stroke:#0088cc,color:#fff
 ```
 
 Each user gets their own pair of MCP server subprocesses, spawned on demand and evicted after idle timeout. Credentials are encrypted at rest with AES-128 (Fernet) and never stored in plaintext.
