@@ -26,7 +26,7 @@ flowchart TB
         AUTH -->|"has creds"| AGENT
 
         subgraph ONBOARD [" 📋  Onboarding "]
-            CONNECT("/connect · 4-step credential flow")
+            CONNECT("/connect · Garmin + optional TP flow")
         end
 
         subgraph BRAIN [" 🧠  AI Engine "]
@@ -189,6 +189,11 @@ docker run -d --name fitness-bot \
 
 The data volume persists the encrypted credential database across container restarts.
 
+## CI/CD
+
+- GitHub Actions publishes the Docker image on pushes to `main` (including merge commits).
+- You can still trigger it manually via `workflow_dispatch`.
+
 ## Deploy to Linode
 
 A one-shot deployment script provisions a Linode Nanode 1GB ($5/month) and starts the bot:
@@ -234,6 +239,8 @@ fitness_ai_bot/
 ├── credential_store.py    # Fernet-encrypted SQLite credential CRUD
 ├── mcp_client.py          # Per-user MCP session pool with idle eviction
 ├── agent.py               # Claude tool-use loop
+├── service.py             # Reusable agent service wrapper
+├── http_api.py            # Optional FastAPI adapter over the service
 └── main.py                # Telegram bot entry point and /connect flow
 ```
 
