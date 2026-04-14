@@ -1,15 +1,12 @@
 name: Publish Docker Image
 
 on:
-  pull_request_review:
-    types: [submitted]
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   publish:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.review.state == 'approved'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -18,8 +15,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -38,7 +33,6 @@ jobs:
           images: ghcr.io/${{ github.repository }}
           tags: |
             type=sha,prefix=
-            type=ref,event=pr
             type=raw,value=latest
 
       - name: Build and push
