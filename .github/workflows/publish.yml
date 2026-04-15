@@ -91,6 +91,8 @@ jobs:
                   - "8000:8000"
                 volumes:
                   - bot-data:/app/data
+                security_opt:
+                  - seccomp=unconfined
             volumes:
               bot-data:
             DCEOF
