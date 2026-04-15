@@ -7,6 +7,9 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends nodejs && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Install Playwright's Chromium and its OS dependencies
+RUN npx playwright install chromium --with-deps
+
 # uv (for Garmin MCP via uvx)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uvx /usr/local/bin/uvx
