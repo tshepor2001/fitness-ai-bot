@@ -53,7 +53,7 @@ def _internal_user_id(user_id: str) -> int:
     if not normalized:
         raise HTTPException(status_code=400, detail="user_id must not be empty")
     digest = hashlib.sha256(normalized.encode("utf-8")).digest()
-    return int.from_bytes(digest[:8], byteorder="big", signed=False)
+    return int.from_bytes(digest[:8], byteorder="big", signed=True)
 
 
 def _agent_error_to_http(exc: Exception) -> HTTPException:
