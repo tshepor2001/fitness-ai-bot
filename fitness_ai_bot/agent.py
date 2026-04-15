@@ -26,10 +26,22 @@ Guidelines:
 MAX_TOOL_ROUNDS = 10  # safety cap on iterative tool calls
 
 
-async def ask(question: str, session: _UserSession) -> str:
-    """Send a question through Claude using the user's MCP session."""
+async def ask(question: str, session: _UserSession, cached_context: str = "") -> str:
+    """Send a question through Claude using the user's MCP session.
+
+    If *cached_context* is provided it is appended to the system prompt
+    so the LLM can answer common questions in one round without tool calls.
+    """
     client = anthropic.AsyncAnthropic(api_key=config.ANTHROPIC_API_KEY)
     tools = session.get_tools()
+
+    system = SYSTEM_PROMPT
+    if cached_context:
+        system += (
+            "\n\nThe following fitness data has already been fetched for this user. "
+            "Use it to answer directly whenever possible — only call tools if the "
+            "question requires data not present below.\n\n" + cached_context
+        )
 
     messages: list[dict[str, Any]] = [{"role": "user", "content": question}]
 
@@ -37,7 +49,7 @@ async def ask(question: str, session: _UserSession) -> str:
         response = await client.messages.create(
             model=config.MODEL,
             max_tokens=4096,
-            system=SYSTEM_PROMPT,
+            system=system,
             tools=tools,
             messages=messages,
         )

@@ -16,6 +16,11 @@ COPY fitness_ai_bot/ fitness_ai_bot/
 
 RUN uv pip install --system .
 
-VOLUME /app/data
+# Pre-warm: cache the Garmin MCP package so first connect is fast
+RUN uvx --python 3.12 --from "git+https://github.com/Taxuspt/garmin_mcp" garmin-mcp --help || true
 
-CMD ["python", "-m", "fitness_ai_bot.main"]
+VOLUME /app/data
+EXPOSE 8000
+
+# Default to the HTTP API; override with "python -m fitness_ai_bot.main" for Telegram bot
+CMD ["python", "-m", "fitness_ai_bot.http_api"]

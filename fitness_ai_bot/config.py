@@ -29,5 +29,8 @@ DATA_DIR = Path(os.getenv("DATA_DIR", "/app/data"))
 # ── session pool ─────────────────────────────────────────────────────
 SESSION_IDLE_TIMEOUT = int(os.getenv("SESSION_IDLE_TIMEOUT", "600"))  # seconds
 
+# ── data cache ───────────────────────────────────────────────────────
+CACHE_TTL = int(os.getenv("CACHE_TTL", "7200"))  # seconds (default 2 hours)
+
 # ── Telegram: restrict to specific user IDs (comma-separated). Empty = allow all.
 ALLOWED_USER_IDS = os.getenv("ALLOWED_USER_IDS", "")

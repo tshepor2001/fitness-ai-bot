@@ -3,8 +3,11 @@
 import asyncio
 import json
 import logging
+import os
+import subprocess
 import time
 from contextlib import AsyncExitStack
+from pathlib import Path
 from typing import Any
 
 from mcp import ClientSession, StdioServerParameters
@@ -14,6 +17,39 @@ from fitness_ai_bot import config
 from fitness_ai_bot.credential_store import CredentialStore
 
 logger = logging.getLogger(__name__)
+
+
+def _passthrough_env() -> dict[str, str]:
+    """Pass network/proxy-related env vars to MCP subprocesses."""
+    keys = [
+        "PATH",
+        "HOME",
+        "USER",
+        "LANG",
+        "LC_ALL",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "NO_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "no_proxy",
+        "SSL_CERT_FILE",
+        "SSL_CERT_DIR",
+        "REQUESTS_CA_BUNDLE",
+        "NODE_EXTRA_CA_CERTS",
+    ]
+    return {k: v for k in keys if (v := os.getenv(k))}
+
+
+def _node_global_modules() -> str:
+    """Return the npm global modules path (e.g. for requiring undici)."""
+    try:
+        return subprocess.check_output(
+            ["npm", "root", "-g"], text=True,
+            env={**os.environ}, timeout=10,
+        ).strip()
+    except Exception:
+        return ""
 
 
 class _UserSession:
@@ -28,6 +64,8 @@ class _UserSession:
     async def start(self, creds: dict[str, str]) -> None:
         await self._exit_stack.__aenter__()
         connected_servers = 0
+        failures: list[str] = []
+        self.server_status: dict[str, str] = {}  # name → "ok" | error message
 
         servers = {
             "garmin": StdioServerParameters(
@@ -38,6 +76,7 @@ class _UserSession:
                     "garmin-mcp",
                 ],
                 env={
+                    **_passthrough_env(),
                     "GARMIN_EMAIL": creds["garmin_email"],
                     "GARMIN_PASSWORD": creds["garmin_password"],
                 },
@@ -45,16 +84,28 @@ class _UserSession:
         }
 
         if "tp_username" in creds:
+            proxy_bootstrap = str(
+                Path(__file__).with_name("proxy-bootstrap.js")
+            )
             servers["trainingpeaks"] = StdioServerParameters(
                 command="npx",
                 args=["-y", "trainingpeaks-mcp@latest"],
                 env={
+                    **_passthrough_env(),
                     "TP_USERNAME": creds["tp_username"],
                     "TP_PASSWORD": creds["tp_password"],
+                    # Node.js built-in fetch() bypasses http/https module patches.
+                    # Our proxy-bootstrap.js uses undici's ProxyAgent instead.
+                    "NODE_OPTIONS": f"-r {proxy_bootstrap}",
+                    "NODE_GLOBAL_MODULES": _node_global_modules(),
+                    "GLOBAL_AGENT_HTTP_PROXY": "http://localhost:3128",
+                    "GLOBAL_AGENT_HTTPS_PROXY": "http://localhost:3128",
                 },
             )
 
         for name, params in servers.items():
+            t0 = time.monotonic()
+            logger.info("[%s] Connecting …  (command: %s)", name, params.command)
             try:
                 transport = await self._exit_stack.enter_async_context(
                     stdio_client(params)
@@ -74,12 +125,31 @@ class _UserSession:
                         "input_schema": tool.inputSchema,
                     })
                 connected_servers += 1
-                logger.info("User session: connected to %s (%d tools)", name, len(tools_result.tools))
-            except Exception:
-                logger.exception("Failed to connect to %s for user session", name)
+                elapsed = time.monotonic() - t0
+                self.server_status[name] = "ok"
+                logger.info(
+                    "[%s] ✓ Connected (%d tools, %.1fs)",
+                    name, len(tools_result.tools), elapsed,
+                )
+            except Exception as exc:
+                elapsed = time.monotonic() - t0
+                err_msg = str(exc) or type(exc).__name__
+                self.server_status[name] = err_msg
+                logger.error(
+                    "[%s] ✗ Failed to connect (%.1fs): %s",
+                    name, elapsed, err_msg, exc_info=True,
+                )
+                failures.append(name)
 
         if connected_servers == 0 or not self._tool_registry:
             await self.stop()
+            if failures:
+                joined = ", ".join(failures)
+                raise RuntimeError(
+                    "No MCP tools are available for this user session. "
+                    f"Failed to initialize: {joined}. "
+                    "Check network access and account credentials, then reconnect."
+                )
             raise RuntimeError("No MCP tools are available for this user session")
 
     async def stop(self) -> None:
@@ -91,14 +161,18 @@ class _UserSession:
             for _, s in self._tool_registry.values()
         ]
 
-    async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> str:
+    async def call_tool(
+        self, tool_name: str, arguments: dict[str, Any], *, timeout: float = 30.0,
+    ) -> str:
         self.last_used = time.monotonic()
         if tool_name not in self._tool_registry:
             return f"Error: unknown tool '{tool_name}'"
 
         server_name, _ = self._tool_registry[tool_name]
         session = self._sessions[server_name]
-        result = await session.call_tool(tool_name, arguments)
+        result = await asyncio.wait_for(
+            session.call_tool(tool_name, arguments), timeout=timeout,
+        )
 
         parts = []
         for block in result.content:
@@ -106,7 +180,16 @@ class _UserSession:
                 parts.append(block.text)
             else:
                 parts.append(json.dumps(block.model_dump(), default=str))
-        return "\n".join(parts)
+        text = "\n".join(parts)
+
+        if getattr(result, "isError", False):
+            logger.warning(
+                "[%s] Tool %s returned error: %s",
+                server_name, tool_name, text[:500],
+            )
+            raise RuntimeError(f"Tool {tool_name} error: {text}")
+
+        return text
 
 
 class MCPPool:

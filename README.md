@@ -1,6 +1,6 @@
-# Fitness AI Bot
+# Sentinel Coach
 
-A multi-user Telegram bot that answers fitness questions using your **Garmin Connect** and (optionally) **TrainingPeaks** data, powered by Claude AI.
+An AI-powered fitness intelligence platform that answers training questions using your **Garmin Connect** and (optionally) **TrainingPeaks** data, powered by Claude AI.
 
 Ask questions like:
 - "What was my training load this week?"
@@ -11,85 +11,9 @@ Ask questions like:
 
 ## Architecture
 
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4f46e5', 'primaryTextColor': '#f8fafc', 'primaryBorderColor': '#818cf8', 'lineColor': '#94a3b8', 'fontSize': '13px', 'fontFamily': 'ui-monospace, monospace' }}}%%
+![Fitness AI Bot Architecture](docs/architecture.svg)
 
-flowchart TB
-    U(("💬<br/>Telegram<br/>Users")) -->|message| TG
-    H(("🌐<br/>HTTP API<br/>Clients")) -->|request| API
-
-    subgraph BOT [" "]
-        direction TB
-
-        TG("📨 Bot Handler") --> AUTH{"Authorised?"}
-        API("🔌 FastAPI Adapter") --> AUTH
-
-        AUTH -->|"first time"| CONNECT
-        AUTH -->|"has creds"| AGENT
-
-        subgraph ONBOARD [" 📋  Onboarding "]
-            CONNECT("/connect · Garmin + optional TP flow")
-        end
-
-        subgraph BRAIN [" 🧠  AI Engine "]
-            AGENT("Claude Haiku · tool-use loop ≤10 rounds")
-        end
-
-        subgraph POOL [" ⚡  Session Pool "]
-            direction LR
-            S1("MCP Session per user") ~~~ REAP("♻️ Idle reaper")
-        end
-
-        subgraph VAULT [" 🔐  Credential Store "]
-            direction LR
-            ENC("Fernet AES-128") --- DB[("SQLite")]
-        end
-
-        CONNECT -->|"encrypt & save"| ENC
-        AGENT <-->|"get / create session"| S1
-        S1 -.->|"load creds"| ENC
-    end
-
-    subgraph DATA [" "]
-        direction LR
-        GARMIN("🏃  Garmin Connect<br/><i>via uvx</i>")
-        TP("🚴  TrainingPeaks<br/><i>via npx</i>")
-    end
-
-    S1 <-->|"MCP tool calls"| GARMIN & TP
-    AGENT -->|"answer"| TG
-    TG -.->|"reply"| U
-
-    classDef default fill:#1e293b,stroke:#334155,color:#f1f5f9,stroke-width:1.5px
-    classDef user fill:#6366f1,stroke:#818cf8,color:#fff,stroke-width:2px
-    classDef handler fill:#3b82f6,stroke:#60a5fa,color:#fff,stroke-width:1.5px
-    classDef gate fill:#f59e0b,stroke:#fbbf24,color:#1e293b,stroke-width:2px
-    classDef onboard fill:#f59e0b,stroke:#fbbf24,color:#1e293b,stroke-width:1.5px
-    classDef ai fill:#8b5cf6,stroke:#a78bfa,color:#fff,stroke-width:2px
-    classDef session fill:#10b981,stroke:#34d399,color:#fff,stroke-width:1.5px
-    classDef reaper fill:#475569,stroke:#64748b,color:#cbd5e1,stroke-width:1px
-    classDef crypto fill:#ef4444,stroke:#f87171,color:#fff,stroke-width:1.5px
-    classDef db fill:#ef4444,stroke:#f87171,color:#fff,stroke-width:1.5px
-    classDef source fill:#f97316,stroke:#fb923c,color:#fff,stroke-width:2px
-    classDef zone fill:#0f172a,stroke:#334155,color:#94a3b8,stroke-width:2px
-    classDef zone2 fill:#0f172a,stroke:#475569,color:#94a3b8,stroke-width:1px
-
-    class U user
-    class H user
-    class TG handler
-    class API handler
-    class AUTH gate
-    class CONNECT onboard
-    class AGENT ai
-    class S1 session
-    class REAP reaper
-    class ENC crypto
-    class DB db
-    class GARMIN,TP source
-    class BOT zone
-    class DATA zone2
-    class ONBOARD,BRAIN,POOL,VAULT zone2
-```
+Mermaid source for the diagram: `docs/architecture.mmd`.
 
 Each user gets their own MCP server subprocesses (Garmin always, TrainingPeaks if connected), spawned on demand and evicted after idle timeout. Credentials are encrypted at rest with AES-128 (Fernet) and never stored in plaintext.
 
@@ -160,6 +84,19 @@ fitness-bot-api
 ```
 
 Default bind: `0.0.0.0:8000`
+
+### Web Frontend
+
+The API now includes a built-in frontend at:
+
+- `GET /` → browser UI for connect / ask / disconnect
+
+Start the API and open:
+
+```bash
+fitness-bot-api
+# then open http://localhost:8000
+```
 
 ### Endpoints
 

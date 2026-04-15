@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sentinel Coach</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="bg-glow bg-glow-a"></div>
+    <div class="bg-glow bg-glow-b"></div>
+
+    <main class="layout">
+      <section class="panel brand">
+        <div class="brand-row">
+          <div class="brand-logo">
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Shield outline -->
+              <path d="M32 4 L8 16 L8 34 C8 48 32 60 32 60 C32 60 56 48 56 34 L56 16 Z" stroke="url(#shield-grad)" stroke-width="2.5" fill="rgba(34,211,238,0.08)"/>
+              <!-- Heartbeat line -->
+              <polyline points="16,34 24,34 27,26 30,42 33,30 36,38 39,34 48,34" stroke="url(#pulse-grad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+              <!-- Small star / spark -->
+              <circle cx="44" cy="20" r="2" fill="#22d3ee" opacity="0.8"/>
+              <circle cx="20" cy="22" r="1.5" fill="#06b6d4" opacity="0.6"/>
+              <defs>
+                <linearGradient id="shield-grad" x1="8" y1="4" x2="56" y2="60">
+                  <stop offset="0%" stop-color="#22d3ee"/>
+                  <stop offset="100%" stop-color="#06b6d4"/>
+                </linearGradient>
+                <linearGradient id="pulse-grad" x1="16" y1="34" x2="48" y2="34">
+                  <stop offset="0%" stop-color="#22d3ee"/>
+                  <stop offset="50%" stop-color="#f97316"/>
+                  <stop offset="100%" stop-color="#06b6d4"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <div>
+            <h1>Sentinel Coach</h1>
+            <p class="tagline">Your AI-powered fitness intelligence platform</p>
+          </div>
+        </div>
+        <div class="brand-stats">
+          <div class="stat-pill"><span class="stat-icon">&#9829;</span> Real-time Garmin sync</div>
+          <div class="stat-pill"><span class="stat-icon">&#9889;</span> TrainingPeaks analysis</div>
+          <div class="stat-pill"><span class="stat-icon">&#9733;</span> AI-driven insights</div>
+        </div>
+        <div id="source-badges" class="source-badges"></div>
+      </section>
+
+      <section class="panel form-panel">
+        <h2>Connect</h2>
+
+        <!-- Mode toggle -->
+        <div class="mode-toggle">
+          <button type="button" id="mode-existing" class="mode-btn active">Existing User</button>
+          <button type="button" id="mode-new" class="mode-btn">New User</button>
+        </div>
+
+        <!-- Existing-user mode -->
+        <form id="select-form" class="mode-section">
+          <label>
+            Select User
+            <select id="user-select">
+              <option value="" disabled selected>Loading users...</option>
+            </select>
+          </label>
+          <div class="row">
+            <button type="submit">Resume Session</button>
+            <button type="button" id="disconnect-btn" class="ghost">Disconnect</button>
+          </div>
+        </form>
+
+        <!-- New-user mode -->
+        <form id="connect-form" class="mode-section hidden">
+          <div class="grid">
+            <label>
+              User Name
+              <input id="user-id" type="text" required placeholder="e.g. tshepo" />
+            </label>
+            <label>
+              Garmin Email
+              <input id="garmin-email" type="email" required placeholder="you@example.com" />
+            </label>
+            <label>
+              Garmin Password
+              <input id="garmin-password" type="password" required />
+            </label>
+            <label>
+              TP Username (optional)
+              <input id="tp-username" type="text" placeholder="your.tp@email.com" />
+            </label>
+            <label>
+              TP Password (optional)
+              <input id="tp-password" type="password" />
+            </label>
+          </div>
+          <div class="row">
+            <button type="submit">Add &amp; Connect</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel chat-panel">
+        <h2>Ask</h2>
+        <form id="ask-form" class="ask-row">
+          <input id="question" type="text" required placeholder="How was my training load this week?" />
+          <button type="submit">Send</button>
+        </form>
+        <pre id="result" class="result">Ready.</pre>
+
+        <!-- Loading overlay -->
+        <div id="spinner-overlay" class="spinner-overlay hidden">
+          <div class="spinner"></div>
+          <p id="spinner-text">Loading your fitness data...</p>
+        </div>
+      </section>
+
+      <section class="panel history-panel">
+        <h2>History</h2>
+        <div id="history" class="history"></div>
+      </section>
+    </main>
+
+    <footer class="footer">Sentinel Coach &mdash; AI-powered fitness intelligence</footer>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

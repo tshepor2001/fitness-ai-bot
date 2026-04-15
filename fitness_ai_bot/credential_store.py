@@ -29,6 +29,11 @@ class CredentialStore:
                    data    BLOB NOT NULL
                )"""
         )
+        # Add user_label column if missing (migration for existing DBs)
+        async with self._db.execute("PRAGMA table_info(user_creds)") as cur:
+            cols = {row[1] for row in await cur.fetchall()}
+        if "user_label" not in cols:
+            await self._db.execute("ALTER TABLE user_creds ADD COLUMN user_label TEXT")
         await self._db.commit()
         logger.info("Credential store ready (%s)", DB_PATH)
 
@@ -38,12 +43,12 @@ class CredentialStore:
 
     # ── read / write ─────────────────────────────────────────────────
 
-    async def save(self, user_id: int, creds: dict[str, str]) -> None:
+    async def save(self, user_id: int, creds: dict[str, str], label: str = "") -> None:
         """Encrypt and persist credentials for a user."""
         blob = self._fernet.encrypt(json.dumps(creds).encode())
         await self._db.execute(
-            "INSERT OR REPLACE INTO user_creds (user_id, data) VALUES (?, ?)",
-            (user_id, blob),
+            "INSERT OR REPLACE INTO user_creds (user_id, data, user_label) VALUES (?, ?, ?)",
+            (user_id, blob, label),
         )
         await self._db.commit()
 
@@ -70,3 +75,22 @@ class CredentialStore:
             "SELECT 1 FROM user_creds WHERE user_id = ?", (user_id,)
         ) as cur:
             return (await cur.fetchone()) is not None
+
+    async def list_users(self) -> list[dict[str, str | int]]:
+        """Return all stored users as [{user_id, label}]."""
+        async with self._db.execute(
+            "SELECT user_id, user_label FROM user_creds ORDER BY user_label"
+        ) as cur:
+            rows = await cur.fetchall()
+        return [
+            {"user_id": row[0], "label": row[1] or str(row[0])}
+            for row in rows
+        ]
+
+    async def update_label(self, user_id: int, label: str) -> None:
+        """Update the display label for an existing user."""
+        await self._db.execute(
+            "UPDATE user_creds SET user_label = ? WHERE user_id = ?",
+            (label, user_id),
+        )
+        await self._db.commit()

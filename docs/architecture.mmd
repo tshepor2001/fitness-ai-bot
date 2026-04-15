@@ -1,0 +1,72 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#0ea5e9', 'primaryTextColor': '#f8fafc', 'primaryBorderColor': '#7dd3fc', 'lineColor': '#38bdf8', 'fontSize': '20px', 'fontFamily': 'Trebuchet MS, Segoe UI, sans-serif', 'clusterBkg': '#0b1220', 'clusterBorder': '#38bdf8', 'tertiaryColor': '#020617' }}}%%
+
+flowchart TB
+    U(("Telegram Users")) -->|message| TG
+    H(("HTTP API Clients")) -->|request| API
+
+    subgraph BOT ["Fitness AI Bot"]
+        direction TB
+
+        TG("Bot Handler") --> AUTH{"Authorised?"}
+        API("FastAPI Adapter") --> AUTH
+
+        AUTH -->|first time| CONNECT
+        AUTH -->|has creds| AGENT
+
+        subgraph ONBOARD ["Onboarding"]
+            CONNECT("/connect · Garmin + optional TP")
+        end
+
+        subgraph BRAIN ["AI Engine"]
+            AGENT("Claude Haiku · tool-use loop <=10 rounds")
+        end
+
+        subgraph POOL ["Session Pool"]
+            direction LR
+            S1("MCP Session per user") ~~~ REAP("Idle reaper")
+        end
+
+        subgraph VAULT ["Credential Store"]
+            direction LR
+            ENC("Fernet AES-128") --- DB[("SQLite")]
+        end
+
+        CONNECT -->|encrypt & save| ENC
+        AGENT <-->|get / create session| S1
+        S1 -.->|load creds| ENC
+    end
+
+    subgraph DATA ["External Data Sources"]
+        direction LR
+        GARMIN("Garmin Connect via uvx")
+        TP("TrainingPeaks via npx")
+    end
+
+    S1 <-->|MCP tool calls| GARMIN & TP
+    AGENT -->|answer| TG
+    AGENT -->|answer| API
+
+    classDef default fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:3px
+    classDef user fill:#2563eb,stroke:#93c5fd,color:#ffffff,stroke-width:3px
+    classDef handler fill:#0284c7,stroke:#67e8f9,color:#ffffff,stroke-width:3px
+    classDef gate fill:#f59e0b,stroke:#fcd34d,color:#1f2937,stroke-width:3px
+    classDef onboard fill:#f59e0b,stroke:#fde68a,color:#1f2937,stroke-width:3px
+    classDef ai fill:#7c3aed,stroke:#c4b5fd,color:#ffffff,stroke-width:3px
+    classDef session fill:#059669,stroke:#6ee7b7,color:#ffffff,stroke-width:3px
+    classDef reaper fill:#334155,stroke:#94a3b8,color:#e2e8f0,stroke-width:3px
+    classDef crypto fill:#dc2626,stroke:#fca5a5,color:#ffffff,stroke-width:3px
+    classDef db fill:#be123c,stroke:#fda4af,color:#ffffff,stroke-width:3px
+    classDef source fill:#ea580c,stroke:#fdba74,color:#ffffff,stroke-width:3px
+    classDef zone fill:#020617,stroke:#38bdf8,color:#bae6fd,stroke-width:3px
+
+    class U,H user
+    class TG,API handler
+    class AUTH gate
+    class CONNECT onboard
+    class AGENT ai
+    class S1 session
+    class REAP reaper
+    class ENC crypto
+    class DB db
+    class GARMIN,TP source
+    class BOT,DATA,ONBOARD,BRAIN,POOL,VAULT zone
