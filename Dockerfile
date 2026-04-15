@@ -20,8 +20,15 @@ COPY fitness_ai_bot/ fitness_ai_bot/
 
 RUN uv pip install --system .
 
-# Pre-warm: cache the Garmin MCP package so first connect is fast
-RUN uvx --python 3.12 --from "git+https://github.com/Taxuspt/garmin_mcp" garmin-mcp --help || true
+# Install garmin-mcp system-wide, overriding the pinned garminconnect==0.2.38
+# with 0.3.x which uses the newer auth that avoids Garmin SSO 429 rate limits.
+RUN uv pip install --system --no-deps "git+https://github.com/Taxuspt/garmin_mcp" && \
+    uv pip install --system \
+        "garminconnect>=0.3.0" \
+        "garth>=0.5.17,<0.6.0" \
+        "mcp>=1.23.0" \
+        "python-dotenv==1.0.1" \
+        "requests==2.32.4"
 
 VOLUME /app/data
 EXPOSE 8000

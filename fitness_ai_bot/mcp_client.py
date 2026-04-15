@@ -72,12 +72,8 @@ class _UserSession:
 
         servers = {
             "garmin": StdioServerParameters(
-                command="uvx",
-                args=[
-                    "--python", "3.12",
-                    "--from", "git+https://github.com/Taxuspt/garmin_mcp",
-                    "garmin-mcp",
-                ],
+                command="garmin-mcp",
+                args=[],
                 env={
                     **_passthrough_env(),
                     "GARMIN_EMAIL": creds["garmin_email"],
