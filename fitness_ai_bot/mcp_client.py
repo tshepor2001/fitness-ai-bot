@@ -73,12 +73,14 @@ class _UserSession:
                 args=[
                     "--python", "3.12",
                     "--from", "git+https://github.com/Taxuspt/garmin_mcp",
+                    "--with", "git+https://github.com/cyberjunky/python-garminconnect@react",
                     "garmin-mcp",
                 ],
                 env={
                     **_passthrough_env(),
                     "GARMIN_EMAIL": creds["garmin_email"],
                     "GARMIN_PASSWORD": creds["garmin_password"],
+                    "GARMINTOKENS": str(config.DATA_DIR / f"garmin_tokens_{creds['garmin_email']}.json"),
                 },
             ),
         }
