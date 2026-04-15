@@ -84,23 +84,32 @@ class _UserSession:
         }
 
         if "tp_username" in creds:
-            proxy_bootstrap = str(
-                Path(__file__).with_name("proxy-bootstrap.js")
+            tp_env: dict[str, str] = {
+                **_passthrough_env(),
+                "TP_USERNAME": creds["tp_username"],
+                "TP_PASSWORD": creds["tp_password"],
+            }
+
+            # Only wire up proxy bootstrap when a proxy is configured.
+            proxy_url = (
+                os.getenv("HTTPS_PROXY") or os.getenv("HTTP_PROXY")
+                or os.getenv("https_proxy") or os.getenv("http_proxy")
             )
+            if proxy_url:
+                proxy_bootstrap = str(
+                    Path(__file__).with_name("proxy-bootstrap.js")
+                )
+                tp_env.update({
+                    "NODE_OPTIONS": f"-r {proxy_bootstrap}",
+                    "NODE_GLOBAL_MODULES": _node_global_modules(),
+                    "GLOBAL_AGENT_HTTP_PROXY": proxy_url,
+                    "GLOBAL_AGENT_HTTPS_PROXY": proxy_url,
+                })
+
             servers["trainingpeaks"] = StdioServerParameters(
                 command="npx",
                 args=["-y", "trainingpeaks-mcp@latest"],
-                env={
-                    **_passthrough_env(),
-                    "TP_USERNAME": creds["tp_username"],
-                    "TP_PASSWORD": creds["tp_password"],
-                    # Node.js built-in fetch() bypasses http/https module patches.
-                    # Our proxy-bootstrap.js uses undici's ProxyAgent instead.
-                    "NODE_OPTIONS": f"-r {proxy_bootstrap}",
-                    "NODE_GLOBAL_MODULES": _node_global_modules(),
-                    "GLOBAL_AGENT_HTTP_PROXY": "http://localhost:3128",
-                    "GLOBAL_AGENT_HTTPS_PROXY": "http://localhost:3128",
-                },
+                env=tp_env,
             )
 
         for name, params in servers.items():
