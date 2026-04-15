@@ -67,6 +67,9 @@ class _UserSession:
         failures: list[str] = []
         self.server_status: dict[str, str] = {}  # name → "ok" | error message
 
+        garmin_token_dir = config.DATA_DIR / f"garmin_{creds['garmin_email']}"
+        garmin_token_dir.mkdir(parents=True, exist_ok=True)
+
         servers = {
             "garmin": StdioServerParameters(
                 command="uvx",
@@ -79,7 +82,7 @@ class _UserSession:
                     **_passthrough_env(),
                     "GARMIN_EMAIL": creds["garmin_email"],
                     "GARMIN_PASSWORD": creds["garmin_password"],
-                    "GARMINTOKENS": str(config.DATA_DIR / f"garmin_{creds['garmin_email']}"),
+                    "GARMINTOKENS": str(garmin_token_dir),
                 },
             ),
         }
