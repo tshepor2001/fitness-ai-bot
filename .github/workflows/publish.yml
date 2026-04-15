@@ -44,3 +44,60 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    needs: publish
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -euo pipefail
+
+            mkdir -p /opt/fitness-ai-bot
+            cd /opt/fitness-ai-bot
+
+            # Write .env from secrets
+            cat > .env << 'ENVEOF'
+            ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
+            CLAUDE_MODEL=${{ secrets.CLAUDE_MODEL }}
+            ENVEOF
+            # Strip leading whitespace from heredoc
+            sed -i 's/^[[:space:]]*//' .env
+
+            # Pull latest image and restart
+            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GHCR_TOKEN }}
+            docker pull ghcr.io/${{ github.repository }}:latest
+
+            # Write a minimal docker-compose for the deployed image
+            cat > docker-compose.yml << 'DCEOF'
+            services:
+              api:
+                image: ghcr.io/${{ github.repository }}:latest
+                container_name: sentinel-coach
+                restart: unless-stopped
+                env_file: .env
+                ports:
+                  - "8000:8000"
+                volumes:
+                  - bot-data:/app/data
+            volumes:
+              bot-data:
+            DCEOF
+
+            docker compose down --remove-orphans 2>/dev/null || true
+            docker compose up -d
+
+            echo "Deployed. Waiting for health check..."
+            sleep 5
+            curl -sf http://localhost:8000/health || echo "WARNING: health check failed"
