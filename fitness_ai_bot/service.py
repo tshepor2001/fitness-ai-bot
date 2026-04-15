@@ -58,8 +58,10 @@ class FitnessAgentService:
             except Exception:
                 logger.warning("Cache sync failed for user %d, proceeding without cache", user_id, exc_info=True)
 
-        cached_context = await self._cache.get_context(user_id)
-        answer = await ask(question, session, cached_context=cached_context)
+        answer = await ask(
+            question, session,
+            cache_store=self._cache._store, user_id=user_id,
+        )
         sources = self._cache.get_sources(user_id)
 
         await self._history.add(

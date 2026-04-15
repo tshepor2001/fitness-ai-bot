@@ -2,6 +2,7 @@
 
 from contextlib import asynccontextmanager
 import hashlib
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from fitness_ai_bot.service import FitnessAgentService
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+)
 
 service = FitnessAgentService()
 
