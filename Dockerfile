@@ -26,7 +26,7 @@ RUN uv pip install --system --no-deps "git+https://github.com/Taxuspt/garmin_mcp
     uv pip install --system \
         "garminconnect>=0.3.0" \
         "garth>=0.5.17,<0.6.0" \
-        "mcp>=1.23.0" \
+        "mcp>=1.23.0,<2" \
         "python-dotenv==1.0.1" \
         "requests==2.32.4"
 
