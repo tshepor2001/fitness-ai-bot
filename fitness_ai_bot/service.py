@@ -1,9 +1,10 @@
 """Reusable agent service wrapper around credentials, MCP sessions, and AI answering."""
 
 import logging
-
+import shutil
 import json
 
+from fitness_ai_bot import config
 from fitness_ai_bot.agent import ask
 from fitness_ai_bot.credential_store import CredentialStore
 from fitness_ai_bot.data_cache import DataCache
@@ -40,6 +41,9 @@ class FitnessAgentService:
     async def connect_user(self, user_id: int, creds: dict[str, str], label: str = "") -> None:
         await self._store.save(user_id, creds, label=label)
         await self._pool.evict_user(user_id)
+        # Clear stale Garmin tokens so the next session does a fresh auth
+        token_dir = config.DATA_DIR / f"garmin_{creds['garmin_email']}"
+        shutil.rmtree(token_dir, ignore_errors=True)
 
     async def disconnect_user(self, user_id: int) -> bool:
         await self._pool.evict_user(user_id)
