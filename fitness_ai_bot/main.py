@@ -176,13 +176,13 @@ async def handle_message(update: Update, context) -> None:
     await update.message.chat.send_action("typing")
 
     try:
-        answer = await service.ask_user(uid, question)
+        answer, _sources = await service.ask_user(uid, question)
     except Exception:
         logger.exception("Agent error for user %d", uid)
         answer = "Something went wrong processing your request. Please try again."
 
     for i in range(0, len(answer), 4096):
-        await update.message.reply_text(answer[i : i + 4096])
+        await update.message.reply_text(answer[i : i + 4096], parse_mode="Markdown")
 
 
 # ── lifecycle ────────────────────────────────────────────────────────
