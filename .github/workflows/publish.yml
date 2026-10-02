@@ -70,7 +70,6 @@ jobs:
             ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
             TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
             ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
-            CLAUDE_MODEL=${{ secrets.CLAUDE_MODEL }}
             ENVEOF
             # Strip leading whitespace from heredoc
             sed -i 's/^[[:space:]]*//' .env
