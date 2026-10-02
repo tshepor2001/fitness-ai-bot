@@ -1,0 +1,25 @@
+name: Fetch Bot Logs
+
+on:
+  workflow_dispatch:
+    inputs:
+      lines:
+        description: Number of log lines to fetch
+        default: "100"
+
+jobs:
+  logs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch logs from server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            echo "=== sentinel-coach-bot logs ==="
+            docker logs sentinel-coach-bot --tail ${{ inputs.lines }} 2>&1 || echo "Container not found"
+            echo ""
+            echo "=== Container status ==="
+            docker compose -f /opt/fitness-ai-bot/docker-compose.yml ps 2>/dev/null || docker ps -a | grep sentinel
