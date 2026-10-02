@@ -115,9 +115,11 @@ class _UserSession:
         for name, params in servers.items():
             t0 = time.monotonic()
             logger.info("[%s] Connecting …  (command: %s)", name, params.command)
+            errlog_path = config.DATA_DIR / f"mcp_{name}_stderr.log"
+            errlog = self._exit_stack.enter_context(open(errlog_path, "w+"))
             try:
                 transport = await self._exit_stack.enter_async_context(
-                    stdio_client(params)
+                    stdio_client(params, errlog=errlog)
                 )
                 read_stream, write_stream = transport
                 session = await self._exit_stack.enter_async_context(
@@ -143,6 +145,12 @@ class _UserSession:
             except Exception as exc:
                 elapsed = time.monotonic() - t0
                 err_msg = str(exc) or type(exc).__name__
+                try:
+                    stderr_tail = errlog_path.read_text()[-800:].strip()
+                except OSError:
+                    stderr_tail = ""
+                if stderr_tail:
+                    err_msg = f"{err_msg}\n--- {name} stderr ---\n{stderr_tail}"
                 self.server_status[name] = err_msg
                 logger.error(
                     "[%s] ✗ Failed to connect (%.1fs): %s",
