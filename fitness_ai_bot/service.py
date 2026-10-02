@@ -3,6 +3,7 @@
 import logging
 import shutil
 import json
+import time
 
 from fitness_ai_bot import config
 from fitness_ai_bot.agent import ask
@@ -12,6 +13,9 @@ from fitness_ai_bot.history_store import HistoryStore
 from fitness_ai_bot.mcp_client import MCPPool
 
 logger = logging.getLogger(__name__)
+
+HISTORY_TURNS = 6
+HISTORY_WINDOW_SECONDS = 24 * 3600
 
 
 class FitnessAgentService:
@@ -62,9 +66,18 @@ class FitnessAgentService:
             except Exception:
                 logger.warning("Cache sync failed for user %d, proceeding without cache", user_id, exc_info=True)
 
+        cutoff = time.time() - HISTORY_WINDOW_SECONDS
+        recent = await self._history.list(user_id, limit=HISTORY_TURNS)
+        history = [
+            (r["question"], r["answer"])
+            for r in reversed(recent)
+            if r["timestamp"] >= cutoff
+        ]
+
         answer = await ask(
             question, session,
             cache_store=self._cache._store, user_id=user_id,
+            history=history,
         )
         sources = self._cache.get_sources(user_id)
 

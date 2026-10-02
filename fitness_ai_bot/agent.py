@@ -154,6 +154,7 @@ async def ask(
     cached_context: str = "",
     cache_store: CacheStore | None = None,
     user_id: int = 0,
+    history: list[tuple[str, str]] | None = None,
 ) -> str:
     """Send a question through Claude using the user's MCP session.
 
@@ -182,7 +183,11 @@ async def ask(
             "question requires data not present below.\n\n" + cached_context
         )
 
-    messages: list[dict[str, Any]] = [{"role": "user", "content": question}]
+    messages: list[dict[str, Any]] = []
+    for past_q, past_a in history or []:
+        messages.append({"role": "user", "content": past_q})
+        messages.append({"role": "assistant", "content": past_a})
+    messages.append({"role": "user", "content": question})
 
     for _ in range(MAX_TOOL_ROUNDS):
         response = await _create_with_retry(
