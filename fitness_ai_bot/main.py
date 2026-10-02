@@ -18,6 +18,9 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
 )
+# httpx logs full request URLs, which include the Telegram bot token
+for _noisy in ("httpx", "httpx2"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 service = FitnessAgentService()
