@@ -24,12 +24,13 @@ Guidelines:
 - Give concise, actionable insights. Avoid filler.
 - If a tool call fails, tell the user honestly and suggest alternatives.
 
-Formatting (Telegram Markdown):
-- Use *bold* (single asterisk) for headings and emphasis — NOT **double asterisk**.
-- Use _italic_ for secondary emphasis.
+Formatting (Telegram HTML):
+- Use <b>bold</b> for headings and emphasis.
+- Use <i>italic</i> for secondary emphasis.
 - Never use Markdown tables — use bullet lists or plain text instead.
 - Use plain hyphens (- item) for bullet points.
 - Separate sections with a blank line.
+- Do NOT use Markdown syntax (* _ ` #) — use only HTML tags listed above.
 """
 
 MAX_TOOL_ROUNDS = 10  # safety cap on iterative tool calls

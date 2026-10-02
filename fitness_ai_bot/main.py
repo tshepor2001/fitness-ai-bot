@@ -184,7 +184,7 @@ async def handle_message(update: Update, context) -> None:
     for i in range(0, len(answer), 4096):
         chunk = answer[i : i + 4096]
         try:
-            await update.message.reply_text(chunk, parse_mode="Markdown")
+            await update.message.reply_text(chunk, parse_mode="HTML")
         except Exception:
             await update.message.reply_text(chunk)
 
