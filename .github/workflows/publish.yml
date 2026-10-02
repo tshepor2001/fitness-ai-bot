@@ -84,12 +84,22 @@ jobs:
             services:
               api:
                 image: ghcr.io/${{ github.repository }}:latest
-                container_name: sentinel-coach
+                container_name: sentinel-coach-api
                 restart: unless-stopped
-                command: python -m fitness_ai_bot.main
+                command: python -m fitness_ai_bot.http_api
                 env_file: .env
                 ports:
                   - "8000:8000"
+                volumes:
+                  - bot-data:/app/data
+                security_opt:
+                  - seccomp=unconfined
+              bot:
+                image: ghcr.io/${{ github.repository }}:latest
+                container_name: sentinel-coach-bot
+                restart: unless-stopped
+                command: python -m fitness_ai_bot.main
+                env_file: .env
                 volumes:
                   - bot-data:/app/data
                 security_opt:
@@ -103,4 +113,5 @@ jobs:
 
             echo "Deployed. Waiting for health check..."
             sleep 5
-            curl -sf http://localhost:8000/health || echo "WARNING: health check failed"
+            curl -sf http://localhost:8000/health || echo "WARNING: API health check failed"
+            docker compose ps
