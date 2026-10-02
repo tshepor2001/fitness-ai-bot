@@ -153,11 +153,13 @@ class _UserSession:
         if connected_servers == 0 or not self._tool_registry:
             await self.stop()
             if failures:
-                joined = ", ".join(failures)
+                details = "; ".join(
+                    f"{name}: {self.server_status.get(name, 'unknown')}"
+                    for name in failures
+                )
                 raise RuntimeError(
-                    "No MCP tools are available for this user session. "
-                    f"Failed to initialize: {joined}. "
-                    "Check network access and account credentials, then reconnect."
+                    f"Failed to connect MCP servers — {details}. "
+                    "Use /disconnect then /connect to re-enter credentials."
                 )
             raise RuntimeError("No MCP tools are available for this user session")
 
