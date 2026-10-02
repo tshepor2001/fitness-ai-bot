@@ -86,6 +86,7 @@ jobs:
                 image: ghcr.io/${{ github.repository }}:latest
                 container_name: sentinel-coach
                 restart: unless-stopped
+                command: python -m fitness_ai_bot.main
                 env_file: .env
                 ports:
                   - "8000:8000"
