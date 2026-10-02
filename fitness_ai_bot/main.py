@@ -182,7 +182,11 @@ async def handle_message(update: Update, context) -> None:
         answer = "Something went wrong processing your request. Please try again."
 
     for i in range(0, len(answer), 4096):
-        await update.message.reply_text(answer[i : i + 4096], parse_mode="Markdown")
+        chunk = answer[i : i + 4096]
+        try:
+            await update.message.reply_text(chunk, parse_mode="Markdown")
+        except Exception:
+            await update.message.reply_text(chunk)
 
 
 # ── lifecycle ────────────────────────────────────────────────────────
