@@ -21,7 +21,7 @@ TELEGRAM_BOT_TOKEN = _require("TELEGRAM_BOT_TOKEN")
 ENCRYPTION_KEY = _require("ENCRYPTION_KEY")  # Fernet key for credential encryption
 
 # ── model ────────────────────────────────────────────────────────────
-MODEL = os.getenv("CLAUDE_MODEL", "claude-haiku-4-20250414")
+MODEL = os.getenv("CLAUDE_MODEL") or "claude-haiku-4-5-20251001"
 
 # ── data directory ───────────────────────────────────────────────────
 DATA_DIR = Path(os.getenv("DATA_DIR", "/app/data"))
