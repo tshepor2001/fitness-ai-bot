@@ -177,9 +177,9 @@ async def handle_message(update: Update, context) -> None:
 
     try:
         answer, _sources = await service.ask_user(uid, question)
-    except Exception:
+    except Exception as exc:
         logger.exception("Agent error for user %d", uid)
-        answer = "Something went wrong processing your request. Please try again."
+        answer = f"Error: {type(exc).__name__}: {exc}"
 
     for i in range(0, len(answer), 4096):
         chunk = answer[i : i + 4096]
