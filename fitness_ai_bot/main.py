@@ -197,6 +197,7 @@ async def handle_message(update: Update, context) -> None:
 async def post_init(app: Application) -> None:
     await service.start()
     logger.info("Credential store + MCP pool ready.")
+    logger.info("Logged in to Telegram as @%s", app.bot.username)
 
 
 async def post_shutdown(app: Application) -> None:
