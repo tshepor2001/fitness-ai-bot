@@ -114,3 +114,6 @@ jobs:
             sleep 5
             curl -sf http://localhost:8000/health || echo "WARNING: API health check failed"
             docker compose ps
+            sleep 20
+            echo "=== bot startup log ==="
+            docker logs sentinel-coach-bot --tail 25 2>&1
