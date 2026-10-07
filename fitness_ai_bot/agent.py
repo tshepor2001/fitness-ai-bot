@@ -161,7 +161,7 @@ async def ask(
     If *cached_context* is provided it is appended to the system prompt
     so the LLM can answer common questions in one round without tool calls.
     """
-    client = anthropic.AsyncAnthropic(api_key=config.ANTHROPIC_API_KEY)
+    client = anthropic.AsyncAnthropic(api_key=config.ANTHROPIC_API_KEY, timeout=90.0)
 
     # Check TP premium status once per session, then cache on the session.
     allowed = _ALLOWED_TOOLS

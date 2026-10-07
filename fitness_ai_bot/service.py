@@ -1,5 +1,6 @@
 """Reusable agent service wrapper around credentials, MCP sessions, and AI answering."""
 
+import asyncio
 import logging
 import shutil
 import json
@@ -26,6 +27,7 @@ class FitnessAgentService:
         self._pool = MCPPool(self._store)
         self._cache = DataCache()
         self._history = HistoryStore()
+        self._sync_tasks: dict[int, asyncio.Task] = {}
 
     async def start(self) -> None:
         await self._store.open()
@@ -59,12 +61,9 @@ class FitnessAgentService:
         if session is None:
             raise RuntimeError("User has no connected credentials")
 
-        # Refresh cache if stale (normally already populated on connect)
+        # Refresh a stale cache in the background; the agent can call tools directly meanwhile.
         if not await self._cache.is_fresh(user_id):
-            try:
-                await self._cache.sync(user_id, session)
-            except Exception:
-                logger.warning("Cache sync failed for user %d, proceeding without cache", user_id, exc_info=True)
+            self._start_background_sync(user_id, session)
 
         cutoff = time.time() - HISTORY_WINDOW_SECONDS
         recent = await self._history.list(user_id, limit=HISTORY_TURNS)
@@ -86,6 +85,19 @@ class FitnessAgentService:
         )
 
         return answer, sources
+
+    def _start_background_sync(self, user_id: int, session) -> None:
+        running = self._sync_tasks.get(user_id)
+        if running and not running.done():
+            return
+
+        async def _run() -> None:
+            try:
+                await self._cache.sync(user_id, session)
+            except Exception:
+                logger.warning("Background cache sync failed for user %d", user_id, exc_info=True)
+
+        self._sync_tasks[user_id] = asyncio.create_task(_run())
 
     async def validate_user_session(self, user_id: int) -> None:
         """Warm up MCP sessions and fail fast if tools are unavailable."""

@@ -1,6 +1,8 @@
 """Telegram bot entry point — multi-user with /connect onboarding."""
 
+import asyncio
 import logging
+import time
 
 from telegram import Update
 from telegram.ext import (
@@ -176,20 +178,58 @@ async def handle_message(update: Update, context) -> None:
 
     question = update.message.text
     logger.info("Question from %s: %s", uid, question[:120])
-    await update.message.chat.send_action("typing")
+    started = time.monotonic()
+    typing = asyncio.create_task(_keep_typing(update))
+    slow_notice = asyncio.create_task(_notify_if_slow(update))
 
     try:
-        answer, _sources = await service.ask_user(uid, question)
+        answer, _sources = await asyncio.wait_for(
+            service.ask_user(uid, question), timeout=ANSWER_TIMEOUT_SECONDS,
+        )
+        logger.info("Answer ready for %d in %.1fs (%d chars)", uid, time.monotonic() - started, len(answer))
+    except asyncio.TimeoutError:
+        logger.error("Answer for %d timed out after %ds", uid, ANSWER_TIMEOUT_SECONDS)
+        answer = "That took too long to answer, so I stopped. Please try again or ask something narrower."
     except Exception:
         logger.exception("Agent error for user %d", uid)
         answer = "Something went wrong processing your request. Please try again."
+    finally:
+        typing.cancel()
+        slow_notice.cancel()
 
     for i in range(0, len(answer), 4096):
         chunk = answer[i : i + 4096]
         try:
             await update.message.reply_text(chunk, parse_mode="HTML")
         except Exception:
+            logger.warning("HTML reply failed for %d, resending as plain text", uid)
             await update.message.reply_text(chunk)
+    logger.info("Reply sent to %d", uid)
+
+
+ANSWER_TIMEOUT_SECONDS = 180
+
+
+async def _keep_typing(update: Update) -> None:
+    """Telegram's typing indicator lasts ~5s, so refresh it until the answer is ready."""
+    while True:
+        try:
+            await update.message.chat.send_action("typing")
+        except Exception:
+            logger.debug("send_action failed", exc_info=True)
+        await asyncio.sleep(4)
+
+
+async def _notify_if_slow(update: Update) -> None:
+    await asyncio.sleep(15)
+    try:
+        await update.message.reply_text("Still on it, pulling your Garmin and TrainingPeaks data…")
+    except Exception:
+        logger.debug("slow notice failed", exc_info=True)
+
+
+async def on_error(update: object, context) -> None:
+    logger.error("Unhandled error while processing an update", exc_info=context.error)
 
 
 # ── lifecycle ────────────────────────────────────────────────────────
@@ -228,7 +268,8 @@ def main() -> None:
     app.add_handler(connect_conv)
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("disconnect", cmd_disconnect))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message, block=False))
+    app.add_error_handler(on_error)
 
     logger.info("Bot is starting (polling mode)…")
     app.run_polling()
