@@ -60,12 +60,33 @@ class _UserSession:
         self._sessions: dict[str, ClientSession] = {}
         self._tool_registry: dict[str, tuple[str, dict[str, Any]]] = {}
         self.last_used: float = time.monotonic()
+        self.server_status: dict[str, str] = {}
+        self._runner: asyncio.Task | None = None
+        self._stop_requested = asyncio.Event()
 
     async def start(self, creds: dict[str, str]) -> None:
-        await self._exit_stack.__aenter__()
+        # The MCP stdio transports use anyio task groups, which must be entered and
+        # exited by the same task. A dedicated owner task does both, so closing a
+        # session from the idle reaper or another handler can't corrupt other tasks.
+        ready: asyncio.Future[None] = asyncio.get_running_loop().create_future()
+        self._runner = asyncio.create_task(self._own_connections(creds, ready))
+        await ready
+
+    async def _own_connections(self, creds: dict[str, str], ready: asyncio.Future[None]) -> None:
+        try:
+            async with self._exit_stack:
+                await self._connect_all(creds)
+                ready.set_result(None)
+                await self._stop_requested.wait()
+        except Exception as exc:
+            if not ready.done():
+                ready.set_exception(exc)
+            else:
+                logger.warning("MCP session closed with an error", exc_info=True)
+
+    async def _connect_all(self, creds: dict[str, str]) -> None:
         connected_servers = 0
         failures: list[str] = []
-        self.server_status: dict[str, str] = {}  # name → "ok" | error message
 
         garmin_token_dir = config.DATA_DIR / f"garmin_{creds['garmin_email']}"
         garmin_token_dir.mkdir(parents=True, exist_ok=True)
@@ -159,7 +180,6 @@ class _UserSession:
                 failures.append(name)
 
         if connected_servers == 0 or not self._tool_registry:
-            await self.stop()
             if failures:
                 details = "; ".join(
                     f"{name}: {self.server_status.get(name, 'unknown')}"
@@ -172,7 +192,9 @@ class _UserSession:
             raise RuntimeError("No MCP tools are available for this user session")
 
     async def stop(self) -> None:
-        await self._exit_stack.aclose()
+        self._stop_requested.set()
+        if self._runner is not None:
+            await self._runner
 
     def get_tools(self) -> list[dict[str, Any]]:
         return [
