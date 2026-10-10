@@ -23,6 +23,8 @@ Guidelines:
 - Present numbers clearly with units (km, bpm, watts, TSS, etc.).
 - Give concise, actionable insights. Avoid filler.
 - If a tool call fails, tell the user honestly and suggest alternatives.
+- This is a phone chat. Keep answers under about 250 words unless the user asks for detail.
+- Fetch only the data the question needs; don't pull every source for a simple question.
 
 Formatting (Telegram HTML):
 - Use <b>bold</b> for headings and emphasis.
@@ -85,16 +87,20 @@ async def _create_with_retry(
     system: str,
     tools: list[dict[str, Any]],
     messages: list[dict[str, Any]],
+    max_tokens: int = 8192,
+    tool_choice: dict[str, str] | None = None,
 ) -> anthropic.types.Message:
     """Call messages.create with exponential backoff on 429 rate-limit errors."""
+    extra: dict[str, Any] = {"tool_choice": tool_choice} if tool_choice else {}
     for attempt in range(_RATE_LIMIT_RETRIES + 1):
         try:
             return await client.messages.create(
                 model=config.MODEL,
-                max_tokens=4096,
+                max_tokens=max_tokens,
                 system=system,
                 tools=tools,
                 messages=messages,
+                **extra,
             )
         except anthropic.RateLimitError:
             if attempt == _RATE_LIMIT_RETRIES:
@@ -196,19 +202,18 @@ async def ask(
 
         u = response.usage
         logger.info(
-            "Token usage | input: %d | output: %d | cache_creation: %s | cache_read: %s",
-            u.input_tokens,
-            u.output_tokens,
-            getattr(u, "cache_creation_input_tokens", None),
-            getattr(u, "cache_read_input_tokens", None),
+            "Token usage | input: %d | output: %d | stop: %s",
+            u.input_tokens, u.output_tokens, response.stop_reason,
         )
 
-        # collect any tool-use blocks
+        if response.stop_reason == "max_tokens":
+            logger.warning("Reply hit the output limit; asking for a short final answer")
+            return await _final_answer(client, system, tools, messages)
+
         tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
 
         if not tool_use_blocks:
-            # final text answer
-            return _extract_text(response)
+            return _extract_text(response) or await _final_answer(client, system, tools, messages)
 
         # append assistant turn
         messages.append({"role": "assistant", "content": response.content})
@@ -231,9 +236,46 @@ async def ask(
 
         messages.append({"role": "user", "content": tool_results})
 
-    return _extract_text(response)
+    logger.warning("Used all %d tool rounds; asking for a final answer", MAX_TOOL_ROUNDS)
+    return await _final_answer(client, system, tools, messages)
+
+
+_FINAL_ANSWER_NOTE = (
+    "Stop gathering data. Using only what you already have, give your final answer "
+    "now in under 250 words. Don't call any tools."
+)
+
+_NO_ANSWER_FALLBACK = (
+    "I gathered your data but couldn't put an answer together. "
+    "Try a narrower question, for example about one race or one week."
+)
+
+
+async def _final_answer(
+    client: anthropic.AsyncAnthropic,
+    system: str,
+    tools: list[dict[str, Any]],
+    messages: list[dict[str, Any]],
+) -> str:
+    """Ask for a concise answer without tools, from the data gathered so far."""
+    closing = list(messages)
+    last = closing[-1]
+    content = last["content"]
+    if isinstance(content, str):
+        content = [{"type": "text", "text": content}]
+    closing[-1] = {**last, "content": [*content, {"type": "text", "text": _FINAL_ANSWER_NOTE}]}
+
+    response = await _create_with_retry(
+        client, system=system, tools=tools, messages=closing,
+        max_tokens=2048, tool_choice={"type": "none"},
+    )
+    logger.info(
+        "Final answer | output: %d | stop: %s",
+        response.usage.output_tokens, response.stop_reason,
+    )
+    return _extract_text(response) or _NO_ANSWER_FALLBACK
 
 
 def _extract_text(response: anthropic.types.Message) -> str:
-    parts = [b.text for b in response.content if hasattr(b, "text")]
-    return "\n".join(parts) or "(no response)"
+    parts = [b.text for b in response.content if getattr(b, "type", "") == "text"]
+    return "\n".join(parts).strip()
